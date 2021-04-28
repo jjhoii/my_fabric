@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
@@ -103,51 +102,48 @@ func transferHelper(ctx contractapi.TransactionContextInterface, from string, to
 		return fmt.Errorf("transfer amount cannot be negative")
 	}
 
-	// Get User and process something
-
-	fromCurrentBalanceBytes, err := ctx.GetStub().GetState(from)
-	if err != nil {
-		return fmt.Errorf("failed to read client account %s from world state: %v", from, err)
-	}
-
-	if fromCurrentBalanceBytes == nil {
-		return fmt.Errorf("client account %s has no balance", from)
-	}
-
-	fromCurrentBalance, _ := strconv.Atoi(string(fromCurrentBalanceBytes)) // Error handling not needed since Itoa() was used when setting the account balance, guaranteeing it was an integer.
-
-	if fromCurrentBalance < value {
-		return fmt.Errorf("client account %s has insufficient funds", from)
-	}
-
-	toCurrentBalanceBytes, err := ctx.GetStub().GetState(to)
-	if err != nil {
-		return fmt.Errorf("failed to read recipient account %s from world state: %v", to, err)
-	}
-
-	var toCurrentBalance int
-	// If recipient current balance doesn't yet exist, we'll create it with a current balance of 0
-	if toCurrentBalanceBytes == nil {
-		toCurrentBalance = 0
-	} else {
-		toCurrentBalance, _ = strconv.Atoi(string(toCurrentBalanceBytes)) // Error handling not needed since Itoa() was used when setting the account balance, guaranteeing it was an integer.
-	}
-
-	fromUpdatedBalance := fromCurrentBalance - value
-	toUpdatedBalance := toCurrentBalance + value
-
-	err = ctx.GetStub().PutState(from, []byte(strconv.Itoa(fromUpdatedBalance)))
+	fromUser, err := GetUser(ctx, from)
 	if err != nil {
 		return err
 	}
 
-	err = ctx.GetStub().PutState(to, []byte(strconv.Itoa(toUpdatedBalance)))
+	toUser, err := GetUser(ctx, to)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("client %s balance updated from %d to %d", from, fromCurrentBalance, fromUpdatedBalance)
-	log.Printf("recipient %s balance updated from %d to %d", to, toCurrentBalance, toUpdatedBalance)
+	if fromUser.Balance < value {
+		return fmt.Errorf("user balance lower than %d", value)
+	}
+
+	beforeFromUserBalance := fromUser.Balance
+	beforeToUserBalance := toUser.Balance
+	fromUser.Balance -= value
+	toUser.Balance += value
+
+	//update
+	fromUserJSON, err := json.Marshal(fromUser)
+	if err != nil {
+		return err
+	}
+
+	toUserJSON, err := json.Marshal(toUser)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.GetStub().PutState(from, fromUserJSON)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.GetStub().PutState(to, toUserJSON)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("client %s balance updated from %d to %d", from, beforeFromUserBalance, fromUser.Balance)
+	log.Printf("recipient %s balance updated from %d to %d", to, beforeToUserBalance, toUser.Balance)
 
 	return nil
 }
@@ -192,7 +188,6 @@ func UserExist(ctx contractapi.TransactionContextInterface, id string) (bool, er
 }
 
 func GetTransaction(ctx contractapi.TransactionContextInterface, txid string) (*Transaction, error) {
-	// do something
 	transactionJSON, err := ctx.GetStub().GetState(txid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from world state: %v", err)
@@ -204,4 +199,17 @@ func GetTransaction(ctx contractapi.TransactionContextInterface, txid string) (*
 		return nil, fmt.Errorf("")
 	}
 	return &transaction, nil
+}
+
+func SetTransaction(ctx contractapi.TransactionContextInterface, from string, to string, balance int) (*Transaction, error) {
+	txid := ctx.GetStub().GetTxID()
+	transaction := Transaction{TXID: txid, From: from, To: to, Value: balance}
+	transactionJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ctx.GetStub().PutState(txid, transactionJSON)
+
+	return &transaction, err
 }
