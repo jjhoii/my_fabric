@@ -57,7 +57,7 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 
 // BalanceOf returns the balance of the given account
 func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, id string) (int, error) {
-	user, err := GetUser(ctx, id)
+	user, err := s.GetUser(ctx, id)
 	if err != nil {
 		return 0, fmt.Errorf("user id %s does not exist", id)
 	}
@@ -72,13 +72,13 @@ func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, i
 func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
 
 	// Initiate the transfer
-	err := transferHelper(ctx, from, to, value)
+	err := s.transferHelper(ctx, from, to, value)
 	if err != nil {
 		return fmt.Errorf("failed to transfer: %v", err)
 	}
 
 	// Emit the Transfer event
-	err = SetEvent(ctx, "Transfer", event{from, to, value})
+	err = s.SetEvent(ctx, "Transfer", event{from, to, value})
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface
 
 // transferHelper is a helper function that transfers tokens from the "from" address to the "to" address
 // Dependant functions include Transfer and TransferFrom
-func transferHelper(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
+func (s *SmartContract) transferHelper(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
 
 	if from == to {
 		return fmt.Errorf("cannot transfer to and from same client account")
@@ -102,12 +102,12 @@ func transferHelper(ctx contractapi.TransactionContextInterface, from string, to
 		return fmt.Errorf("transfer amount cannot be negative")
 	}
 
-	fromUser, err := GetUser(ctx, from)
+	fromUser, err := s.GetUser(ctx, from)
 	if err != nil {
 		return err
 	}
 
-	toUser, err := GetUser(ctx, to)
+	toUser, err := s.GetUser(ctx, to)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func transferHelper(ctx contractapi.TransactionContextInterface, from string, to
 	return nil
 }
 
-func SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e event) error {
+func (s *SmartContract) SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e event) error {
 	// Emit the Transfer event
 	transferEvent := e
 	transferEventJSON, err := json.Marshal(transferEvent)
@@ -163,7 +163,7 @@ func SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e e
 	return nil
 }
 
-func GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
+func (s *SmartContract) GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
 	// do something
 	transactionJSON, err := ctx.GetStub().GetState(id)
 	if err != nil {
@@ -178,7 +178,7 @@ func GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, err
 	return &user, nil
 }
 
-func UserExist(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
+func (s *SmartContract) UserExist(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
 	userJSON, err := ctx.GetStub().GetState(id)
 	if err != nil {
 		return false, fmt.Errorf("failed to read from world state: %v", err)
@@ -187,7 +187,7 @@ func UserExist(ctx contractapi.TransactionContextInterface, id string) (bool, er
 	return userJSON != nil, nil
 }
 
-func GetTransaction(ctx contractapi.TransactionContextInterface, txid string) (*Transaction, error) {
+func (s *SmartContract) GetTransaction(ctx contractapi.TransactionContextInterface, txid string) (*Transaction, error) {
 	transactionJSON, err := ctx.GetStub().GetState(txid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from world state: %v", err)
@@ -201,7 +201,7 @@ func GetTransaction(ctx contractapi.TransactionContextInterface, txid string) (*
 	return &transaction, nil
 }
 
-func SetTransaction(ctx contractapi.TransactionContextInterface, from string, to string, balance int) (*Transaction, error) {
+func (s *SmartContract) SetTransaction(ctx contractapi.TransactionContextInterface, from string, to string, balance int) (*Transaction, error) {
 	txid := ctx.GetStub().GetTxID()
 	transaction := Transaction{TXID: txid, From: from, To: to, Value: balance}
 	transactionJSON, err := json.Marshal(transaction)
