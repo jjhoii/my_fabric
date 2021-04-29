@@ -40,20 +40,16 @@ func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, i
 		return 0, fmt.Errorf("user id %s does not exist", id)
 	}
 
-	balance := user.Balance
-
-	return balance, nil
+	return user.Balance, nil
 }
 
 func (s *SmartContract) TypeOf(ctx contractapi.TransactionContextInterface, id string) (string, error) {
 	user, err := GetUser(ctx, id)
 	if err != nil {
-		return "", fmt.Errorf("user id %s does not exist", id)
+		return "_", fmt.Errorf("user id %s does not exist", id)
 	}
 
-	_type := user.Type
-
-	return _type, nil
+	return user.Type, nil
 }
 
 // TransferFrom transfers the value amount from the "from" address to the "to" address
