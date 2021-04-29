@@ -33,31 +33,9 @@ type Transaction struct {
 	Value int    `json:"value"`
 }
 
-// InitLedger adds a base set of assets to the ledger
-func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	assets := []User{
-		{ID: "TestUser", Type: "user", Balance: 100000},
-		{ID: "TestSeller", Type: "seller", Balance: 0},
-	}
-
-	for _, asset := range assets {
-		assetJSON, err := json.Marshal(asset)
-		if err != nil {
-			return err
-		}
-
-		err = ctx.GetStub().PutState(asset.ID, assetJSON)
-		if err != nil {
-			return fmt.Errorf("failed to put to world state. %v", err)
-		}
-	}
-
-	return nil
-}
-
 // BalanceOf returns the balance of the given account
 func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, id string) (int, error) {
-	user, err := s.GetUser(ctx, id)
+	user, err := GetUser(ctx, id)
 	if err != nil {
 		return 0, fmt.Errorf("user id %s does not exist", id)
 	}
@@ -67,18 +45,35 @@ func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, i
 	return balance, nil
 }
 
+func (s *SmartContract) TypeOf(ctx contractapi.TransactionContextInterface, id string) (string, error) {
+	user, err := GetUser(ctx, id)
+	if err != nil {
+		return "", fmt.Errorf("user id %s does not exist", id)
+	}
+
+	_type := user.Type
+
+	return _type, nil
+}
+
 // TransferFrom transfers the value amount from the "from" address to the "to" address
 // This function triggers a Transfer event
 func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
 
 	// Initiate the transfer
-	err := s.transferHelper(ctx, from, to, value)
+	err := transferHelper(ctx, from, to, value)
 	if err != nil {
 		return fmt.Errorf("failed to transfer: %v", err)
 	}
 
+	// Set transaction
+	_, terr := SetTransaction(ctx, from, to, value)
+	if terr != nil {
+		return fmt.Errorf("failed to set transaction: %v", terr)
+	}
+
 	// Emit the Transfer event
-	err = s.SetEvent(ctx, "Transfer", event{from, to, value})
+	err = SetEvent(ctx, "Transfer", event{from, to, value})
 	if err != nil {
 		return err
 	}
@@ -92,7 +87,7 @@ func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface
 
 // transferHelper is a helper function that transfers tokens from the "from" address to the "to" address
 // Dependant functions include Transfer and TransferFrom
-func (s *SmartContract) transferHelper(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
+func transferHelper(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
 
 	if from == to {
 		return fmt.Errorf("cannot transfer to and from same client account")
@@ -102,12 +97,12 @@ func (s *SmartContract) transferHelper(ctx contractapi.TransactionContextInterfa
 		return fmt.Errorf("transfer amount cannot be negative")
 	}
 
-	fromUser, err := s.GetUser(ctx, from)
+	fromUser, err := GetUser(ctx, from)
 	if err != nil {
 		return err
 	}
 
-	toUser, err := s.GetUser(ctx, to)
+	toUser, err := GetUser(ctx, to)
 	if err != nil {
 		return err
 	}
@@ -121,7 +116,7 @@ func (s *SmartContract) transferHelper(ctx contractapi.TransactionContextInterfa
 	fromUser.Balance -= value
 	toUser.Balance += value
 
-	//update
+	// update
 	fromUserJSON, err := json.Marshal(fromUser)
 	if err != nil {
 		return err
@@ -148,7 +143,7 @@ func (s *SmartContract) transferHelper(ctx contractapi.TransactionContextInterfa
 	return nil
 }
 
-func (s *SmartContract) SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e event) error {
+func SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e event) error {
 	// Emit the Transfer event
 	transferEvent := e
 	transferEventJSON, err := json.Marshal(transferEvent)
@@ -163,25 +158,59 @@ func (s *SmartContract) SetEvent(ctx contractapi.TransactionContextInterface, ev
 	return nil
 }
 
-func (s *SmartContract) GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
-	// do something
-	transactionJSON, err := ctx.GetStub().GetState(id)
+func GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
+	userJSON, err := ctx.GetStub().GetState(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from world state: %v", err)
 	}
+	if userJSON == nil {
+		return nil, fmt.Errorf("user %s does not exist", id)
+	}
 
 	var user User
-	err = json.Unmarshal(transactionJSON, &user)
+	err = json.Unmarshal(userJSON, &user)
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
+func (s *SmartContract) CreateUser(ctx contractapi.TransactionContextInterface, _id string, _type string) (*User, error) {
+	user := User{ID: _id, Type: _type, Balance: 0}
+	userJSON, err := json.Marshal(user)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create user: %v", err)
+	}
+
+	err = ctx.GetStub().PutState(_id, userJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to put to world state. %v", err)
+	}
+
+	return &user, nil
+}
+
+func (s *SmartContract) DeleteUser(ctx contractapi.TransactionContextInterface, _id string) error {
+	exist, err := s.UserExist(ctx, _id)
+	if !exist {
+		return fmt.Errorf("user %s does not exist: %v", _id, err)
+	}
+
+	err = ctx.GetStub().DelState(_id)
+	if err != nil {
+		return fmt.Errorf("failed to put to world state. %v", err)
+	}
+
+	return nil
+}
+
 func (s *SmartContract) UserExist(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
 	userJSON, err := ctx.GetStub().GetState(id)
 	if err != nil {
 		return false, fmt.Errorf("failed to read from world state: %v", err)
+	}
+	if userJSON == nil {
+		return false, fmt.Errorf("user %s does not exist", id)
 	}
 
 	return userJSON != nil, nil
@@ -204,7 +233,7 @@ func (s *SmartContract) GetTransaction(ctx contractapi.TransactionContextInterfa
 	return &transaction, nil
 }
 
-func (s *SmartContract) SetTransaction(ctx contractapi.TransactionContextInterface, from string, to string, balance int) (*Transaction, error) {
+func SetTransaction(ctx contractapi.TransactionContextInterface, from string, to string, balance int) (*Transaction, error) {
 	txid := ctx.GetStub().GetTxID()
 	transaction := Transaction{TXID: txid, From: from, To: to, Value: balance}
 	transactionJSON, err := json.Marshal(transaction)
