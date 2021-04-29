@@ -192,6 +192,9 @@ func (s *SmartContract) GetTransaction(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from world state: %v", err)
 	}
+	if transactionJSON == nil {
+		return nil, fmt.Errorf("the transaction %s does not exist", txid)
+	}
 
 	var transaction Transaction
 	err = json.Unmarshal(transactionJSON, &transaction)
