@@ -246,7 +246,7 @@ func SetTransaction(ctx contractapi.TransactionContextInterface, from string, to
 	return &transaction, err
 }
 
-func SetBalance(ctx contractapi.TransactionContextInterface, id string, balance int) (*User, error) {
+func (s *SmartContract) SetBalance(ctx contractapi.TransactionContextInterface, id string, balance int) (*User, error) {
 	user, err := GetUser(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("user id %s does not exist", id)
