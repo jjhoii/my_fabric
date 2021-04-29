@@ -173,7 +173,7 @@ func (s *SmartContract) GetUser(ctx contractapi.TransactionContextInterface, id 
 	var user User
 	err = json.Unmarshal(transactionJSON, &user)
 	if err != nil {
-		return nil, fmt.Errorf("")
+		return nil, err
 	}
 	return &user, nil
 }
@@ -196,7 +196,7 @@ func (s *SmartContract) GetTransaction(ctx contractapi.TransactionContextInterfa
 	var transaction Transaction
 	err = json.Unmarshal(transactionJSON, &transaction)
 	if err != nil {
-		return nil, fmt.Errorf("")
+		return nil, err
 	}
 	return &transaction, nil
 }
