@@ -58,29 +58,29 @@ func (s *SmartContract) TypeOf(ctx contractapi.TransactionContextInterface, id s
 
 // TransferFrom transfers the value amount from the "from" address to the "to" address
 // This function triggers a Transfer event
-func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface, from string, to string, value int) error {
+func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface, from string, to string, value int) (*Transaction, error) {
 
 	// Initiate the transfer
 	err := transferHelper(ctx, from, to, value)
 	if err != nil {
-		return fmt.Errorf("failed to transfer: %v", err)
+		return nil, fmt.Errorf("failed to transfer: %v", err)
 	}
 
 	// Set transaction
-	_, terr := SetTransaction(ctx, from, to, value)
-	if terr != nil {
-		return fmt.Errorf("failed to set transaction: %v", terr)
+	transaction, err := SetTransaction(ctx, from, to, value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set transaction: %v", err)
 	}
 
 	// Emit the Transfer event
 	err = SetEvent(ctx, "Transfer", event{from, to, value})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Printf("%s transfer %d balance to %s", from, value, to)
 
-	return nil
+	return transaction, nil
 }
 
 // Helper Functions
