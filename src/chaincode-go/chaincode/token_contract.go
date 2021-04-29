@@ -33,25 +33,6 @@ type Transaction struct {
 	Value int    `json:"value"`
 }
 
-// BalanceOf returns the balance of the given account
-func (s *SmartContract) BalanceOf(ctx contractapi.TransactionContextInterface, id string) (int, error) {
-	user, err := GetUser(ctx, id)
-	if err != nil {
-		return 0, fmt.Errorf("user id %s does not exist", id)
-	}
-
-	return user.Balance, nil
-}
-
-func (s *SmartContract) TypeOf(ctx contractapi.TransactionContextInterface, id string) (string, error) {
-	user, err := GetUser(ctx, id)
-	if err != nil {
-		return "_", fmt.Errorf("user id %s does not exist", id)
-	}
-
-	return user.Type, nil
-}
-
 // TransferFrom transfers the value amount from the "from" address to the "to" address
 // This function triggers a Transfer event
 func (s *SmartContract) TransferFrom(ctx contractapi.TransactionContextInterface, from string, to string, value int) (*Transaction, error) {
@@ -155,6 +136,23 @@ func SetEvent(ctx contractapi.TransactionContextInterface, eventName string, e e
 }
 
 func GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
+	userJSON, err := ctx.GetStub().GetState(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from world state: %v", err)
+	}
+	if userJSON == nil {
+		return nil, fmt.Errorf("user %s does not exist", id)
+	}
+
+	var user User
+	err = json.Unmarshal(userJSON, &user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *SmartContract) GetUser(ctx contractapi.TransactionContextInterface, id string) (*User, error) {
 	userJSON, err := ctx.GetStub().GetState(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from world state: %v", err)
