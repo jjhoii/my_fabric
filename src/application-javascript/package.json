@@ -12,7 +12,8 @@
         "express": "^4.17.1",
         "fabric-ca-client": "^2.2.4",
         "fabric-network": "^2.2.4",
-        "morgan": "^1.10.0"
+        "morgan": "^1.10.0",
+        "portscanner": "^2.2.0"
     },
     "devDependencies": {
         "nodemon": "^2.0.7"
